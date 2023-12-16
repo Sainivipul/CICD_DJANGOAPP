@@ -1,0 +1,34 @@
+pipeline {
+    agent any
+    
+    stages{
+        stage("code"){
+            steps{
+                echo "cloning code "
+                git url:"https://github.com/Sainivipul/CICD_DJANGOAPP.git",branch :"main"
+            }
+        }
+        stage("build"){
+            steps{
+                echo "building code image "
+                sh "docker build -t my-note-app ."
+            }
+        }
+        stage("push"){
+            steps{
+                echo "pushing image to docker hub "
+                withCredentials([usernamePassword(credentailsId"dockerhub",passwordVariable:"dockerhubPass",userVariable:"dockerhubUsername")]){
+                    sh "docker tag my-note-app ${env.dockerhubUsername}/my-note-app:latest"
+                    sh "docker login -u ${env.dockerhubUsername} -p${env.dockerhubPass}"
+                    sh "docker push my-note-app ${env.dockerhubUsername}/my-note-app:latest"
+                }
+            }
+        }
+        stage("Deploy"){
+            steps{
+                echo "Deploying image "
+                sh "docker compose -d -p 8000:8000 sainivipul/my-note-app:latest"
+                sh "docker-compose down && docker-compose up -d"
+            }
+        }
+    }
