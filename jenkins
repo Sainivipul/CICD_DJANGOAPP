@@ -1,34 +1,51 @@
 pipeline {
     agent any
-    
+    tools{
+        jdk 'jdk17'
+        nodejs 'node16'
+    }
+    environment {
+        SCANNER_HOME=tool 'sonar-scanner'
+    }
     stages{
-        stage("code"){
+        stage ("cloning code "){
             steps{
                 echo "cloning code "
-                git url:"https://github.com/Sainivipul/CICD_DJANGOAPP.git",branch :"main"
-            }
+            git url : "https://github.com/Sainivipul/CICD_DJANGOAPP.git" , branch: "main"
+                }
         }
-        stage("build"){
+        stage("Sonarqube Analysis"){
             steps{
-                echo "building code image "
-                sh "docker build -t my-note-app ."
-            }
-        }
-        stage("push"){
-            steps{
-                echo "pushing image to docker hub "
-                withCredentials([usernamePassword(credentailsId"dockerhub",passwordVariable:"dockerhubPass",userVariable:"dockerhubUsername")]){
-                    sh "docker tag my-note-app ${env.dockerhubUsername}/my-note-app:latest"
-                    sh "docker login -u ${env.dockerhubUsername} -p${env.dockerhubPass}"
-                    sh "docker push my-note-app ${env.dockerhubUsername}/my-note-app:latest"
+                withSonarQubeEnv('sonar-server') {
+                    sh ''' $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName=Todo -Dsonar.projectKey=Todo '''
+                    
                 }
             }
         }
-        stage("Deploy"){
+        stage ("building image "){
             steps{
-                echo "Deploying image "
-                sh "docker compose -d -p 8000:8000 sainivipul/my-note-app:latest"
+                echo "building the image "
+               sh "docker build -t proimg ." 
+            }
+           
+        }
+        stage ("pushing img to docker hub "){
+            steps{
+                echo "pushing img to docker hub "
+                
+                withCredentials([usernamePassword(credentialsId:"dockerHub",passwordVariable:"dockerHubPass",usernameVariable:"dockerHubUser")]){
+                    sh "docker tag proimg ${env.dockerHubUser}/proimg:latest"
+                    sh "docker login -u ${env.dockerHubUser} -p ${env.dockerHubPass}"
+                    sh "docker push ${env.dockerHubUser}/proimg:latest "
+                }
+            }
+        }
+        stage ("Application Deployment"){
+            steps{
+                echo "Deploying container"
                 sh "docker-compose down && docker-compose up -d"
+                
             }
         }
     }
+}
